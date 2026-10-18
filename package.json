@@ -1,0 +1,49 @@
+{
+	"name": "n8n-nodes-jeffy",
+	"version": "0.1.0",
+	"description": "n8n community node for Jeffy — fast text classification powered by frozen embeddings + logistic regression",
+	"keywords": [
+		"n8n-community-node-package",
+		"jeffy",
+		"text-classification",
+		"nlp",
+		"machine-learning",
+		"embeddings"
+	],
+	"license": "MIT",
+	"homepage": "https://github.com/nicobrenner/n8n-nodes-jeffy",
+	"author": {
+		"name": "Nico Brenner",
+		"email": "nbrenner@gmail.com"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/nicobrenner/n8n-nodes-jeffy.git"
+	},
+	"main": "dist/nodes/Jeffy/Jeffy.node.js",
+	"scripts": {
+		"build": "tsc && cp nodes/Jeffy/jeffy.svg nodes/Jeffy/Jeffy.node.json dist/nodes/Jeffy/",
+		"dev": "tsc --watch",
+		"lint": "eslint nodes/ credentials/ --ext .ts",
+		"prepublishOnly": "npm run build"
+	},
+	"files": [
+		"dist"
+	],
+	"n8n": {
+		"n8nNodesApiVersion": 1,
+		"credentials": [
+			"dist/credentials/JeffyApi.credentials.js"
+		],
+		"nodes": [
+			"dist/nodes/Jeffy/Jeffy.node.js"
+		]
+	},
+	"devDependencies": {
+		"typescript": "~5.7.0",
+		"@types/node": "^22.0.0"
+	},
+	"peerDependencies": {
+		"n8n-workflow": "*"
+	}
+}

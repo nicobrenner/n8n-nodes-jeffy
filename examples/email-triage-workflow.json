@@ -1,0 +1,137 @@
+{
+	"name": "Email Triage with Jeffy",
+	"nodes": [
+		{
+			"parameters": {
+				"httpMethod": "POST",
+				"path": "incoming-email",
+				"responseMode": "lastNode"
+			},
+			"name": "Webhook",
+			"type": "n8n-nodes-base.webhook",
+			"typeVersion": 2,
+			"position": [240, 300]
+		},
+		{
+			"parameters": {
+				"operation": "classify",
+				"task": "inbox_router",
+				"text": "={{ $json.body.subject + ': ' + $json.body.text }}"
+			},
+			"name": "Jeffy Classify",
+			"type": "n8n-nodes-jeffy.jeffy",
+			"typeVersion": 1,
+			"position": [480, 300],
+			"credentials": {
+				"jeffyApi": {
+					"id": "1",
+					"name": "Jeffy Playground"
+				}
+			}
+		},
+		{
+			"parameters": {
+				"rules": {
+					"rules": [
+						{
+							"conditions": {
+								"conditions": [
+									{
+										"leftValue": "={{ $json.label }}",
+										"rightValue": "work",
+										"operator": {
+											"type": "string",
+											"operation": "equals"
+										}
+									}
+								]
+							},
+							"renameOutput": true,
+							"outputLabel": "Work"
+						},
+						{
+							"conditions": {
+								"conditions": [
+									{
+										"leftValue": "={{ $json.label }}",
+										"rightValue": "promo",
+										"operator": {
+											"type": "string",
+											"operation": "equals"
+										}
+									}
+								]
+							},
+							"renameOutput": true,
+							"outputLabel": "Promo"
+						},
+						{
+							"conditions": {
+								"conditions": [
+									{
+										"leftValue": "={{ $json.label }}",
+										"rightValue": "family",
+										"operator": {
+											"type": "string",
+											"operation": "equals"
+										}
+									}
+								]
+							},
+							"renameOutput": true,
+							"outputLabel": "Family"
+						}
+					]
+				}
+			},
+			"name": "Route by Label",
+			"type": "n8n-nodes-base.switch",
+			"typeVersion": 3,
+			"position": [720, 300]
+		},
+		{
+			"parameters": {
+				"channel": "#work-inbox",
+				"text": "=New work email: {{ $('Webhook').item.json.body.subject }}\nConfidence: {{ $('Jeffy Classify').item.json.confidence }}"
+			},
+			"name": "Slack: Work",
+			"type": "n8n-nodes-base.slack",
+			"typeVersion": 2,
+			"position": [960, 160]
+		},
+		{
+			"parameters": {
+				"operation": "delete"
+			},
+			"name": "Archive Promo",
+			"type": "n8n-nodes-base.noOp",
+			"typeVersion": 1,
+			"position": [960, 300]
+		},
+		{
+			"parameters": {
+				"channel": "#family",
+				"text": "=Family email from {{ $('Webhook').item.json.body.from }}"
+			},
+			"name": "Slack: Family",
+			"type": "n8n-nodes-base.slack",
+			"typeVersion": 2,
+			"position": [960, 440]
+		}
+	],
+	"connections": {
+		"Webhook": {
+			"main": [[{ "node": "Jeffy Classify", "type": "main", "index": 0 }]]
+		},
+		"Jeffy Classify": {
+			"main": [[{ "node": "Route by Label", "type": "main", "index": 0 }]]
+		},
+		"Route by Label": {
+			"main": [
+				[{ "node": "Slack: Work", "type": "main", "index": 0 }],
+				[{ "node": "Archive Promo", "type": "main", "index": 0 }],
+				[{ "node": "Slack: Family", "type": "main", "index": 0 }]
+			]
+		}
+	}
+}

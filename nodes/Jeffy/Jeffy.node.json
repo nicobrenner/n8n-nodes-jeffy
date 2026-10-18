@@ -1,0 +1,17 @@
+{
+	"node": "n8n-nodes-jeffy.jeffy",
+	"nodeVersion": "1.0",
+	"codexVersion": "1.0",
+	"categories": ["AI", "Miscellaneous"],
+	"resources": {
+		"primaryDocumentation": [
+			{
+				"url": "https://jeffyclassify.com"
+			}
+		]
+	},
+	"alias": ["classify", "classification", "text", "nlp", "ml", "jeffy", "embeddings"],
+	"subcategories": {
+		"AI": ["Text Classification"]
+	}
+}
