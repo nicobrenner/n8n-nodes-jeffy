@@ -4,6 +4,8 @@ n8n community node for [Jeffy](https://jeffyclassify.com) — fast text classifi
 
 Classify text in your n8n workflows using 15+ pretrained classifiers (banking intents, sentiment, news topics, emotions, and more) or connect to your own Jeffy server with custom tasks
 
+![Workflow demo: Webhook → Jeffy → Switch routing](workflow_demo.gif)
+
 ## Installation
 
 In your n8n instance:
