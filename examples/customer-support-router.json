@@ -1,323 +1,222 @@
 {
-  "name": "Customer Support Router",
+  "name": "Jeffy Support Router (self-hosted, Jeffy node)",
   "nodes": [
+    {
+      "parameters": {
+        "content": "## Jeffy Support Router — self-hosted n8n\n\nClassifies an incoming support message into one of 77 banking intents, then routes it by **how confident** the classifier is rather than by label alone.\n\n**Setup**\n1. Settings → Community Nodes → install `n8n-nodes-jeffy`\n2. Create a **Jeffy API** credential. Base URL `https://playground.jeffyclassify.com` works with no signup, or point it at your own `jeffy-serve`\n3. Select that credential in the Jeffy node, then hit Execute Workflow\n\nNo API key, no LLM, no per-call cost. Runs on CPU.\n\nOn n8n Cloud, community nodes cannot be installed yet — use `cloud-http-router.json` instead, which does the same thing with an HTTP Request node.",
+        "height": 420,
+        "width": 420,
+        "color": 4
+      },
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-520, 120]
+    },
+    {
+      "parameters": {
+        "content": "### Replace this\n\nSwap the Code node for your real trigger (Webhook, Gmail, Chatwoot, Zendesk, Front) and map the ticket text onto `message`.",
+        "height": 220,
+        "width": 300,
+        "color": 7
+      },
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [20, 20]
+    },
+    {
+      "parameters": {
+        "content": "### Why route on confidence\n\n`confidence` is the top class probability, `margin` is the gap to the runner-up. A high confidence with a thin margin means two intents look alike, so it is a close call, not a safe auto-route.\n\nTune `AUTO`, `SUGGEST` and `MIN_MARGIN` against your own labelled tickets. These defaults are a starting point, not a recommendation.",
+        "height": 300,
+        "width": 360,
+        "color": 7
+      },
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [660, -80]
+    },
     {
       "parameters": {},
       "name": "Run Workflow",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
-      "position": [
-        240,
-        384
-      ]
+      "position": [-60, 300]
     },
     {
       "parameters": {
-        "jsCode": "const messages = [\n  \"I want to close my account and get my money back\",\n  \"My card was stolen at the ATM last night\",\n  \"My card is about to expire, how do I renew it?\",\n  \"How do I set up Apple Pay?\",\n  \"I lost my debit card, please block it immediately\",\n  \"What currencies does the app support?\",\n  \"Someone made a charge I dont recognize\",\n  \"I need to cancel everything and switch banks\"\n];\nconst pick = messages[Math.floor(Math.random() * messages.length)];\nreturn [{ json: { message: pick } }];"
+        "jsCode": "// Sample messages. Replace this node with your real trigger\n// (Webhook, Gmail, Chatwoot, Zendesk, etc) and map the text to `message`.\n// One per routing tier, measured against the banking77 task used below:\n//   clear intent        -> auto-route\n//   vague but in scope  -> suggest and confirm\n//   thin margin         -> manual review\n//   not banking at all  -> out of scope\nconst messages = [\n  \"I was charged twice for my last transaction\",\n  \"My card is about to expire, how do I renew it?\",\n  \"it is broken again\",\n  \"What currencies does the app support?\",\n  \"I would like to apply for a job at your company\"\n];\nconst pick = messages[Math.floor(Math.random() * messages.length)];\nreturn [{ json: { message: pick } }];"
       },
-      "name": "Customer Message",
+      "name": "Incoming Message",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        464,
-        384
-      ]
+      "position": [160, 300]
     },
     {
       "parameters": {
+        "operation": "classify",
         "task": "banking77",
         "text": "={{ $json.message }}",
-        "options": {}
+        "options": {
+          "threshold": 0.3
+        }
       },
       "name": "Jeffy Classify",
-      "type": "CUSTOM.jeffy",
+      "type": "n8n-nodes-jeffy.jeffy",
       "typeVersion": 1,
-      "position": [
-        704,
-        384
-      ],
-      "credentials": {
-        "jeffyApi": {
-          "id": "",
-          "name": "Jeffy API"
-        }
-      }
+      "position": [380, 300]
     },
     {
       "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 2
-          },
-          "conditions": [
+        "jsCode": "// Three-tier confidence routing.\n// Jeffy returns: label, confidence, margin, out_of_scope, probabilities,\n// plus best_guess when the threshold rejects the top label.\n// Keep the node's Confidence Threshold option BELOW SUGGEST (it is 0.3 here),\n// otherwise the server marks everything under SUGGEST out_of_scope and the\n// manual-review tier can never fire.\nconst AUTO = 0.8;        // auto-route at or above this confidence\nconst SUGGEST = 0.5;     // suggest-and-confirm between SUGGEST and AUTO\nconst MIN_MARGIN = 0.15; // top-two gap below this means it is a close call\n\n// The Jeffy node returns one result per input item, in order, so index pairing holds.\nreturn $input.all().map((item, i) => {\n  const r = item.json;\n  const source = $('Incoming Message').all()[i];\n  const message = source ? source.json.message : null;\n\n  let tier;\n  if (r.out_of_scope) {\n    tier = 'out_of_scope';\n  } else if (r.confidence >= AUTO && (r.margin ?? 1) >= MIN_MARGIN) {\n    tier = 'auto';\n  } else if (r.confidence >= SUGGEST) {\n    tier = 'suggest';\n  } else {\n    tier = 'review';\n  }\n\n  return {\n    json: {\n      message,\n      tier,\n      label: r.label,\n      confidence: r.confidence,\n      margin: r.margin,\n      best_guess: r.best_guess ?? null,\n      top_alternatives: Object.entries(r.probabilities || {}).slice(0, 3)\n    }\n  };\n});"
+      },
+      "name": "Decide Tier",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [600, 300]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
             {
-              "leftValue": "={{ $json.label }}",
-              "rightValue": "terminate_account",
-              "operator": {
-                "type": "string",
-                "operation": "equals"
+              "conditions": {
+                "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2},
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.tier }}",
+                    "rightValue": "auto",
+                    "operator": {"type": "string", "operation": "equals"}
+                  }
+                ],
+                "combinator": "and"
               },
-              "id": "a8cf166d-d808-4a0d-b6e2-a18ba4e1ec93"
+              "renameOutput": true,
+              "outputKey": "Auto-route"
+            },
+            {
+              "conditions": {
+                "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2},
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.tier }}",
+                    "rightValue": "suggest",
+                    "operator": {"type": "string", "operation": "equals"}
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Suggest and confirm"
+            },
+            {
+              "conditions": {
+                "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2},
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.tier }}",
+                    "rightValue": "out_of_scope",
+                    "operator": {"type": "string", "operation": "equals"}
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Out of scope"
             }
-          ],
-          "combinator": "and"
+          ]
         },
-        "options": {}
+        "options": {"fallbackOutput": "extra", "renameFallbackOutput": "Manual review"}
       },
-      "name": "Account Closure?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
-      "position": [
-        944,
-        384
-      ]
+      "name": "Route by Confidence",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [820, 300]
     },
     {
       "parameters": {
         "assignments": {
           "assignments": [
-            {
-              "id": "a1",
-              "name": "department",
-              "type": "string",
-              "value": "\ud83d\udd34 Retention Team"
-            },
-            {
-              "id": "a2",
-              "name": "priority",
-              "type": "string",
-              "value": "high"
-            },
-            {
-              "id": "a3",
-              "name": "action",
-              "type": "string",
-              "value": "Escalate to retention specialist"
-            },
-            {
-              "id": "a4",
-              "name": "classified_as",
-              "type": "string",
-              "value": "={{ $json.label }}"
-            },
-            {
-              "id": "a5",
-              "name": "confidence",
-              "type": "string",
-              "value": "={{ Math.round($json.confidence * 100) + \"%\" }}"
-            }
+            {"id": "a1", "name": "action", "value": "auto-assigned", "type": "string"},
+            {"id": "a2", "name": "queue", "value": "={{ $json.label }}", "type": "string"}
           ]
         },
         "options": {}
       },
-      "name": "\u2192 Retention Team",
+      "name": "→ Assign to Queue",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [
-        1200,
-        272
-      ]
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 1
-          },
-          "conditions": [
-            {
-              "leftValue": "={{ $json.label }}",
-              "rightValue": "lost_or_stolen",
-              "operator": {
-                "type": "string",
-                "operation": "contains"
-              }
-            }
-          ],
-          "combinator": "or"
-        },
-        "options": {}
-      },
-      "name": "Lost/Stolen?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
-      "position": [
-        1200,
-        512
-      ]
+      "position": [1060, 120]
     },
     {
       "parameters": {
         "assignments": {
           "assignments": [
-            {
-              "id": "b1",
-              "name": "department",
-              "type": "string",
-              "value": "\ud83d\udfe0 Urgent Support"
-            },
-            {
-              "id": "b2",
-              "name": "priority",
-              "type": "string",
-              "value": "critical"
-            },
-            {
-              "id": "b3",
-              "name": "action",
-              "type": "string",
-              "value": "Block card immediately"
-            },
-            {
-              "id": "b4",
-              "name": "classified_as",
-              "type": "string",
-              "value": "={{ $json.label }}"
-            },
-            {
-              "id": "b5",
-              "name": "confidence",
-              "type": "string",
-              "value": "={{ Math.round($json.confidence * 100) + \"%\" }}"
-            }
+            {"id": "b1", "name": "action", "value": "suggested-needs-confirm", "type": "string"},
+            {"id": "b2", "name": "queue", "value": "={{ $json.label }}", "type": "string"}
           ]
         },
         "options": {}
       },
-      "name": "\u2192 Urgent Support",
+      "name": "→ Suggest to Agent",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [
-        1472,
-        384
-      ]
+      "position": [1060, 280]
     },
     {
       "parameters": {
         "assignments": {
           "assignments": [
-            {
-              "id": "d1",
-              "name": "department",
-              "type": "string",
-              "value": "\ud83d\udfe2 General Support"
-            },
-            {
-              "id": "d2",
-              "name": "priority",
-              "type": "string",
-              "value": "normal"
-            },
-            {
-              "id": "d3",
-              "name": "action",
-              "type": "string",
-              "value": "Add to support queue"
-            },
-            {
-              "id": "d4",
-              "name": "classified_as",
-              "type": "string",
-              "value": "={{ $json.label }}"
-            },
-            {
-              "id": "d5",
-              "name": "confidence",
-              "type": "string",
-              "value": "={{ Math.round($json.confidence * 100) + \"%\" }}"
-            }
+            {"id": "c1", "name": "action", "value": "out-of-scope", "type": "string"},
+            {"id": "c2", "name": "queue", "value": "general-inbox", "type": "string"},
+            {"id": "c3", "name": "closest_intent", "value": "={{ $json.best_guess }}", "type": "string"}
           ]
         },
         "options": {}
       },
-      "name": "\u2192 General Support",
+      "name": "→ Out of Scope Desk",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [
-        1472,
-        624
-      ]
+      "position": [1060, 440]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {"id": "d1", "name": "action", "value": "manual-review", "type": "string"},
+            {"id": "d2", "name": "queue", "value": "triage", "type": "string"}
+          ]
+        },
+        "options": {}
+      },
+      "name": "→ Manual Review",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1060, 600]
     }
   ],
   "connections": {
     "Run Workflow": {
-      "main": [
-        [
-          {
-            "node": "Customer Message",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{"node": "Incoming Message", "type": "main", "index": 0}]]
     },
-    "Customer Message": {
-      "main": [
-        [
-          {
-            "node": "Jeffy Classify",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "Incoming Message": {
+      "main": [[{"node": "Jeffy Classify", "type": "main", "index": 0}]]
     },
     "Jeffy Classify": {
-      "main": [
-        [
-          {
-            "node": "Account Closure?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{"node": "Decide Tier", "type": "main", "index": 0}]]
     },
-    "Account Closure?": {
-      "main": [
-        [
-          {
-            "node": "\u2192 Retention Team",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Lost/Stolen?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "Decide Tier": {
+      "main": [[{"node": "Route by Confidence", "type": "main", "index": 0}]]
     },
-    "Lost/Stolen?": {
+    "Route by Confidence": {
       "main": [
-        [
-          {
-            "node": "\u2192 Urgent Support",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "\u2192 General Support",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        [{"node": "→ Assign to Queue", "type": "main", "index": 0}],
+        [{"node": "→ Suggest to Agent", "type": "main", "index": 0}],
+        [{"node": "→ Out of Scope Desk", "type": "main", "index": 0}],
+        [{"node": "→ Manual Review", "type": "main", "index": 0}]
       ]
     }
   },
-  "settings": {
-    "executionOrder": "v1",
-    "binaryMode": "separate"
-  }
+  "settings": {"executionOrder": "v1"}
 }

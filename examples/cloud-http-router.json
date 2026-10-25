@@ -2,6 +2,42 @@
   "name": "Jeffy Support Router (n8n Cloud, HTTP Request)",
   "nodes": [
     {
+      "parameters": {
+        "content": "## Jeffy Support Router — n8n Cloud\n\nClassifies an incoming support message into one of 77 banking intents, then routes it by **how confident** the classifier is rather than by label alone.\n\n**Setup: none.** Import and hit Execute Workflow. The HTTP Request node points at a free public Jeffy instance that needs no key and no signup.\n\nNo community node required, so this runs on n8n Cloud as-is. No LLM, no per-call cost, no token limits.\n\n**To use your own classifiers**, run `pip install jeffy-classify && jeffy-serve` and swap the URL in the HTTP Request node. `GET /v1/capabilities` lists what a server has loaded.",
+        "height": 400,
+        "width": 420,
+        "color": 4
+      },
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-620, 120]
+    },
+    {
+      "parameters": {
+        "content": "### Replace this\n\nSwap the Code node for your real trigger (Webhook, Gmail, Chatwoot, Zendesk, Front) and map the ticket text onto `message`.",
+        "height": 220,
+        "width": 300,
+        "color": 7
+      },
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-80, 20]
+    },
+    {
+      "parameters": {
+        "content": "### Why route on confidence\n\n`confidence` is the top class probability, `margin` is the gap to the runner-up. A high confidence with a thin margin means two intents look alike, so it is a close call, not a safe auto-route.\n\nTune `AUTO`, `SUGGEST` and `MIN_MARGIN` against your own labelled tickets. These defaults are a starting point, not a recommendation.",
+        "height": 300,
+        "width": 360,
+        "color": 7
+      },
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [560, -80]
+    },
+    {
       "parameters": {},
       "name": "Run Workflow",
       "type": "n8n-nodes-base.manualTrigger",
@@ -10,7 +46,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Sample messages. Replace this node with your real trigger\n// (Webhook, Gmail, Chatwoot, Zendesk, etc) and map the text to `message`.\n// These map to banking77 labels, the task used below.\nconst messages = [\n  \"I was charged twice for my last transaction\",\n  \"My card was stolen last night, please block it\",\n  \"Why is there an extra fee on my statement?\",\n  \"How do I change my PIN?\",\n  \"Can you tell me the weather in Lisbon next week?\"\n];\nconst pick = messages[Math.floor(Math.random() * messages.length)];\nreturn [{ json: { message: pick } }];"
+        "jsCode": "// Sample messages. Replace this node with your real trigger\n// (Webhook, Gmail, Chatwoot, Zendesk, etc) and map the text to `message`.\n// One per routing tier, measured against the banking77 task used below:\n//   clear intent        -> auto-route\n//   vague but in scope  -> suggest and confirm\n//   thin margin         -> manual review\n//   not banking at all  -> out of scope\nconst messages = [\n  \"I was charged twice for my last transaction\",\n  \"My card is about to expire, how do I renew it?\",\n  \"it is broken again\",\n  \"What currencies does the app support?\",\n  \"I would like to apply for a job at your company\"\n];\nconst pick = messages[Math.floor(Math.random() * messages.length)];\nreturn [{ json: { message: pick } }];"
       },
       "name": "Incoming Message",
       "type": "n8n-nodes-base.code",
@@ -23,7 +59,7 @@
         "url": "https://playground.jeffyclassify.com/v1/predict",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"text\": {{ JSON.stringify($json.message) }},\n  \"task\": \"banking77\",\n  \"threshold\": 0.5\n}",
+        "jsonBody": "={\n  \"text\": {{ JSON.stringify($json.message) }},\n  \"task\": \"banking77\",\n  \"threshold\": 0.3\n}",
         "options": {}
       },
       "name": "Jeffy Classify (HTTP)",
@@ -33,7 +69,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Three-tier confidence routing.\n// Jeffy returns: label, confidence, margin, out_of_scope, probabilities\nconst AUTO = 0.8;   // auto-route at or above this confidence\nconst SUGGEST = 0.5; // suggest-and-confirm between SUGGEST and AUTO\nconst MIN_MARGIN = 0.15; // top-two gap below this means it is a close call\n\nreturn $input.all().map(item => {\n  const r = item.json;\n  const message = $('Incoming Message').first().json.message;\n\n  let tier;\n  if (r.out_of_scope) {\n    tier = 'out_of_scope';\n  } else if (r.confidence >= AUTO && (r.margin ?? 1) >= MIN_MARGIN) {\n    tier = 'auto';\n  } else if (r.confidence >= SUGGEST) {\n    tier = 'suggest';\n  } else {\n    tier = 'review';\n  }\n\n  return {\n    json: {\n      message,\n      tier,\n      label: r.label,\n      confidence: r.confidence,\n      margin: r.margin,\n      top_alternatives: Object.entries(r.probabilities || {}).slice(0, 3)\n    }\n  };\n});"
+        "jsCode": "// Three-tier confidence routing.\n// Jeffy returns: label, confidence, margin, out_of_scope, probabilities,\n// plus best_guess when the threshold rejects the top label.\n// Keep the \"threshold\" in the HTTP Request body BELOW SUGGEST (it is 0.3 here),\n// otherwise the server marks everything under SUGGEST out_of_scope and the\n// manual-review tier can never fire.\nconst AUTO = 0.8;        // auto-route at or above this confidence\nconst SUGGEST = 0.5;     // suggest-and-confirm between SUGGEST and AUTO\nconst MIN_MARGIN = 0.15; // top-two gap below this means it is a close call\n\n// The HTTP Request node returns one response per input item, in order, so index pairing holds.\nreturn $input.all().map((item, i) => {\n  const r = item.json;\n  const source = $('Incoming Message').all()[i];\n  const message = source ? source.json.message : null;\n\n  let tier;\n  if (r.out_of_scope) {\n    tier = 'out_of_scope';\n  } else if (r.confidence >= AUTO && (r.margin ?? 1) >= MIN_MARGIN) {\n    tier = 'auto';\n  } else if (r.confidence >= SUGGEST) {\n    tier = 'suggest';\n  } else {\n    tier = 'review';\n  }\n\n  return {\n    json: {\n      message,\n      tier,\n      label: r.label,\n      confidence: r.confidence,\n      margin: r.margin,\n      best_guess: r.best_guess ?? null,\n      top_alternatives: Object.entries(r.probabilities || {}).slice(0, 3)\n    }\n  };\n});"
       },
       "name": "Decide Tier",
       "type": "n8n-nodes-base.code",
@@ -133,7 +169,8 @@
         "assignments": {
           "assignments": [
             {"name": "action", "value": "out-of-scope", "type": "string"},
-            {"name": "queue", "value": "general-inbox", "type": "string"}
+            {"name": "queue", "value": "general-inbox", "type": "string"},
+            {"name": "closest_intent", "value": "={{ $json.best_guess }}", "type": "string"}
           ]
         },
         "options": {}

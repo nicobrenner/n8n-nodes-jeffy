@@ -28,7 +28,7 @@ n8n Cloud only allows installing *verified* community nodes, so this node cannot
 - URL: `https://playground.jeffyclassify.com/v1/predict` (or your own server)
 - Body (JSON): `{ "text": "{{ $json.message }}", "task": "banking77" }`
 
-The response has `label`, `confidence`, `margin` and `probabilities`, so you can branch on it with a Switch or IF node exactly as with the node. See [examples/cloud-http-router.json](examples/cloud-http-router.json) for an importable workflow with three-tier confidence routing (auto-route, suggest-and-confirm, manual review) plus out-of-scope handling.
+The response has `label`, `confidence`, `margin` and `probabilities`, so you can branch on it with a Switch or IF node exactly as with the node. See [examples/cloud-http-router.json](examples/cloud-http-router.json) for an importable workflow with confidence-tier routing (auto-route, suggest-and-confirm, manual review) plus out-of-scope handling.
 
 Run `GET /v1/capabilities` against whichever server you point at to see which tasks it has loaded. The public playground carries the core set; `support_ticket` and other newer tasks need a self-hosted server on jeffy-classify 0.1.0a16 or later.
 
@@ -74,14 +74,25 @@ Use `confidence` and `margin` (the gap between the top two classes) to decide wh
 
 ## Example workflows
 
-Two importable workflows are in [`examples/`](examples/):
+Two importable workflows are in [`examples/`](examples/). They are the same workflow twice, differing only in how they call Jeffy:
 
 | File | Needs | Works on |
 |---|---|---|
 | [`customer-support-router.json`](examples/customer-support-router.json) | this community node | self-hosted n8n |
 | [`cloud-http-router.json`](examples/cloud-http-router.json) | nothing, plain HTTP Request nodes | n8n Cloud and self-hosted |
 
-Both use a Manual Trigger with sample messages so you can run them immediately. The Cloud one implements three-tier routing: auto-route above 0.8 confidence, suggest-and-confirm between 0.5 and 0.8, manual review below, plus a separate branch for out-of-scope input.
+Both start from a Manual Trigger with sample messages, so you can import and run them straight away with no credentials beyond the server URL. Both route on confidence rather than on label alone, into four branches:
+
+| Tier | Condition | Example message | Result |
+|---|---|---|---|
+| Auto-route | confidence ≥ 0.8 and margin ≥ 0.15 | "I was charged twice for my last transaction" | `transaction_charged_twice` 0.9963 |
+| Suggest and confirm | confidence ≥ 0.5 | "it is broken again" | `card_not_working` 0.6721 |
+| Manual review | below 0.5, still in scope | "What currencies does the app support?" | `supported_cards_and_currencies` 0.4055, margin 0.0969 |
+| Out of scope | below the request threshold | "I would like to apply for a job at your company" | `out_of_scope`, closest intent `country_support` |
+
+Those numbers come from running both workflows against the public playground, and the two produce identical routing, so you can prototype on Cloud with HTTP Request and switch to the node later without touching the logic downstream.
+
+One gotcha if you adapt them: keep the request `threshold` *below* your suggest-and-confirm cutoff. Set them equal and the server marks everything under the cutoff `out_of_scope`, which makes the manual-review branch unreachable.
 
 ## Available pretrained tasks
 
