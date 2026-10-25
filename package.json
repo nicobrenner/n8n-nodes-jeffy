@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-jeffy",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "n8n community node for Jeffy: fast text classification powered by frozen embeddings + logistic regression",
   "keywords": [
     "n8n-community-node-package",
