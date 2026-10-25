@@ -1,0 +1,323 @@
+{
+  "name": "Customer Support Router",
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Run Workflow",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const messages = [\n  \"I want to close my account and get my money back\",\n  \"My card was stolen at the ATM last night\",\n  \"My card is about to expire, how do I renew it?\",\n  \"How do I set up Apple Pay?\",\n  \"I lost my debit card, please block it immediately\",\n  \"What currencies does the app support?\",\n  \"Someone made a charge I dont recognize\",\n  \"I need to cancel everything and switch banks\"\n];\nconst pick = messages[Math.floor(Math.random() * messages.length)];\nreturn [{ json: { message: pick } }];"
+      },
+      "name": "Customer Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        464,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "task": "banking77",
+        "text": "={{ $json.message }}",
+        "options": {}
+      },
+      "name": "Jeffy Classify",
+      "type": "CUSTOM.jeffy",
+      "typeVersion": 1,
+      "position": [
+        704,
+        384
+      ],
+      "credentials": {
+        "jeffyApi": {
+          "id": "",
+          "name": "Jeffy API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.label }}",
+              "rightValue": "terminate_account",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "id": "a8cf166d-d808-4a0d-b6e2-a18ba4e1ec93"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Account Closure?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        944,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "department",
+              "type": "string",
+              "value": "\ud83d\udd34 Retention Team"
+            },
+            {
+              "id": "a2",
+              "name": "priority",
+              "type": "string",
+              "value": "high"
+            },
+            {
+              "id": "a3",
+              "name": "action",
+              "type": "string",
+              "value": "Escalate to retention specialist"
+            },
+            {
+              "id": "a4",
+              "name": "classified_as",
+              "type": "string",
+              "value": "={{ $json.label }}"
+            },
+            {
+              "id": "a5",
+              "name": "confidence",
+              "type": "string",
+              "value": "={{ Math.round($json.confidence * 100) + \"%\" }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "\u2192 Retention Team",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1200,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.label }}",
+              "rightValue": "lost_or_stolen",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "name": "Lost/Stolen?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1200,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b1",
+              "name": "department",
+              "type": "string",
+              "value": "\ud83d\udfe0 Urgent Support"
+            },
+            {
+              "id": "b2",
+              "name": "priority",
+              "type": "string",
+              "value": "critical"
+            },
+            {
+              "id": "b3",
+              "name": "action",
+              "type": "string",
+              "value": "Block card immediately"
+            },
+            {
+              "id": "b4",
+              "name": "classified_as",
+              "type": "string",
+              "value": "={{ $json.label }}"
+            },
+            {
+              "id": "b5",
+              "name": "confidence",
+              "type": "string",
+              "value": "={{ Math.round($json.confidence * 100) + \"%\" }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "\u2192 Urgent Support",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1472,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d1",
+              "name": "department",
+              "type": "string",
+              "value": "\ud83d\udfe2 General Support"
+            },
+            {
+              "id": "d2",
+              "name": "priority",
+              "type": "string",
+              "value": "normal"
+            },
+            {
+              "id": "d3",
+              "name": "action",
+              "type": "string",
+              "value": "Add to support queue"
+            },
+            {
+              "id": "d4",
+              "name": "classified_as",
+              "type": "string",
+              "value": "={{ $json.label }}"
+            },
+            {
+              "id": "d5",
+              "name": "confidence",
+              "type": "string",
+              "value": "={{ Math.round($json.confidence * 100) + \"%\" }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "\u2192 General Support",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1472,
+        624
+      ]
+    }
+  ],
+  "connections": {
+    "Run Workflow": {
+      "main": [
+        [
+          {
+            "node": "Customer Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Customer Message": {
+      "main": [
+        [
+          {
+            "node": "Jeffy Classify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Jeffy Classify": {
+      "main": [
+        [
+          {
+            "node": "Account Closure?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Account Closure?": {
+      "main": [
+        [
+          {
+            "node": "\u2192 Retention Team",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Lost/Stolen?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lost/Stolen?": {
+      "main": [
+        [
+          {
+            "node": "\u2192 Urgent Support",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "\u2192 General Support",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  }
+}

@@ -2,13 +2,13 @@
 
 n8n community node for [Jeffy](https://jeffyclassify.com) — fast text classification powered by frozen embeddings + logistic regression
 
-Classify text in your n8n workflows using 15+ pretrained classifiers (banking intents, sentiment, news topics, emotions, and more) or connect to your own Jeffy server with custom tasks
+Classify text in your n8n workflows using 70+ pretrained classifiers (support tickets, banking intents, sentiment, news topics, emotions, and more) or connect to your own Jeffy server with custom tasks
 
 ![Workflow demo: Webhook → Jeffy → Switch routing](workflow_demo.gif)
 
 ## Installation
 
-In your n8n instance:
+### Self-hosted n8n
 
 1. Go to **Settings → Community Nodes**
 2. Enter `n8n-nodes-jeffy`
@@ -19,6 +19,18 @@ Or install manually:
 ```bash
 npm install n8n-nodes-jeffy
 ```
+
+### n8n Cloud
+
+n8n Cloud only allows installing *verified* community nodes, so this node cannot be installed there yet. Use an **HTTP Request** node pointed at Jeffy instead, which works identically:
+
+- Method: `POST`
+- URL: `https://playground.jeffyclassify.com/v1/predict` (or your own server)
+- Body (JSON): `{ "text": "{{ $json.message }}", "task": "banking77" }`
+
+The response has `label`, `confidence`, `margin` and `probabilities`, so you can branch on it with a Switch or IF node exactly as with the node. See [examples/cloud-http-router.json](examples/cloud-http-router.json) for an importable workflow with three-tier confidence routing (auto-route, suggest-and-confirm, manual review) plus out-of-scope handling.
+
+Run `GET /v1/capabilities` against whichever server you point at to see which tasks it has loaded. The public playground carries the core set; `support_ticket` and other newer tasks need a self-hosted server on jeffy-classify 0.1.0a16 or later.
 
 ## Operations
 
@@ -68,7 +80,7 @@ The public playground includes classifiers for:
 Jeffy runs anywhere with Python and a CPU — no GPU needed
 
 ```bash
-pip install jeffy-classifier
+pip install jeffy-classify
 jeffy-serve
 ```
 

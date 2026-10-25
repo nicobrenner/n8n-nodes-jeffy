@@ -1,0 +1,185 @@
+{
+  "name": "Jeffy Support Router (n8n Cloud, HTTP Request)",
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Run Workflow",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-160, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Sample messages. Replace this node with your real trigger\n// (Webhook, Gmail, Chatwoot, Zendesk, etc) and map the text to `message`.\n// These map to banking77 labels, the task used below.\nconst messages = [\n  \"I was charged twice for my last transaction\",\n  \"My card was stolen last night, please block it\",\n  \"Why is there an extra fee on my statement?\",\n  \"How do I change my PIN?\",\n  \"Can you tell me the weather in Lisbon next week?\"\n];\nconst pick = messages[Math.floor(Math.random() * messages.length)];\nreturn [{ json: { message: pick } }];"
+      },
+      "name": "Incoming Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [60, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://playground.jeffyclassify.com/v1/predict",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"text\": {{ JSON.stringify($json.message) }},\n  \"task\": \"banking77\",\n  \"threshold\": 0.5\n}",
+        "options": {}
+      },
+      "name": "Jeffy Classify (HTTP)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [280, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Three-tier confidence routing.\n// Jeffy returns: label, confidence, margin, out_of_scope, probabilities\nconst AUTO = 0.8;   // auto-route at or above this confidence\nconst SUGGEST = 0.5; // suggest-and-confirm between SUGGEST and AUTO\nconst MIN_MARGIN = 0.15; // top-two gap below this means it is a close call\n\nreturn $input.all().map(item => {\n  const r = item.json;\n  const message = $('Incoming Message').first().json.message;\n\n  let tier;\n  if (r.out_of_scope) {\n    tier = 'out_of_scope';\n  } else if (r.confidence >= AUTO && (r.margin ?? 1) >= MIN_MARGIN) {\n    tier = 'auto';\n  } else if (r.confidence >= SUGGEST) {\n    tier = 'suggest';\n  } else {\n    tier = 'review';\n  }\n\n  return {\n    json: {\n      message,\n      tier,\n      label: r.label,\n      confidence: r.confidence,\n      margin: r.margin,\n      top_alternatives: Object.entries(r.probabilities || {}).slice(0, 3)\n    }\n  };\n});"
+      },
+      "name": "Decide Tier",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2},
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.tier }}",
+                    "rightValue": "auto",
+                    "operator": {"type": "string", "operation": "equals"}
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Auto-route"
+            },
+            {
+              "conditions": {
+                "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2},
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.tier }}",
+                    "rightValue": "suggest",
+                    "operator": {"type": "string", "operation": "equals"}
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Suggest and confirm"
+            },
+            {
+              "conditions": {
+                "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2},
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.tier }}",
+                    "rightValue": "out_of_scope",
+                    "operator": {"type": "string", "operation": "equals"}
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Out of scope"
+            }
+          ]
+        },
+        "options": {"fallbackOutput": "extra", "renameFallbackOutput": "Manual review"}
+      },
+      "name": "Route by Confidence",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {"name": "action", "value": "auto-assigned", "type": "string"},
+            {"name": "queue", "value": "={{ $json.label }}", "type": "string"}
+          ]
+        },
+        "options": {}
+      },
+      "name": "→ Assign to Queue",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [960, 120]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {"name": "action", "value": "suggested-needs-confirm", "type": "string"},
+            {"name": "queue", "value": "={{ $json.label }}", "type": "string"}
+          ]
+        },
+        "options": {}
+      },
+      "name": "→ Suggest to Agent",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [960, 280]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {"name": "action", "value": "out-of-scope", "type": "string"},
+            {"name": "queue", "value": "general-inbox", "type": "string"}
+          ]
+        },
+        "options": {}
+      },
+      "name": "→ Out of Scope Desk",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [960, 440]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {"name": "action", "value": "manual-review", "type": "string"},
+            {"name": "queue", "value": "triage", "type": "string"}
+          ]
+        },
+        "options": {}
+      },
+      "name": "→ Manual Review",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [960, 600]
+    }
+  ],
+  "connections": {
+    "Run Workflow": {
+      "main": [[{"node": "Incoming Message", "type": "main", "index": 0}]]
+    },
+    "Incoming Message": {
+      "main": [[{"node": "Jeffy Classify (HTTP)", "type": "main", "index": 0}]]
+    },
+    "Jeffy Classify (HTTP)": {
+      "main": [[{"node": "Decide Tier", "type": "main", "index": 0}]]
+    },
+    "Decide Tier": {
+      "main": [[{"node": "Route by Confidence", "type": "main", "index": 0}]]
+    },
+    "Route by Confidence": {
+      "main": [
+        [{"node": "→ Assign to Queue", "type": "main", "index": 0}],
+        [{"node": "→ Suggest to Agent", "type": "main", "index": 0}],
+        [{"node": "→ Out of Scope Desk", "type": "main", "index": 0}],
+        [{"node": "→ Manual Review", "type": "main", "index": 0}]
+      ]
+    }
+  },
+  "settings": {"executionOrder": "v1"}
+}
