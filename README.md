@@ -48,19 +48,40 @@ Run `GET /v1/capabilities` against whichever server you point at to see which ta
 3. Pick a task from the dynamic dropdown — it fetches available classifiers from your server
 4. Pass in text and get back a label + confidence score
 
+## Authentication
+
+The Jeffy node uses a single **Jeffy API** credential with one field, the base URL of your Jeffy server. It defaults to `https://playground.jeffyclassify.com`, a free public instance that needs no API key or signup.
+
+Jeffy itself requires no authentication, so there is no token to manage. If you self-host behind a reverse proxy that adds auth, point the credential at that proxy.
+
 ## Example: Customer support routing
 
 Connect a webhook or email trigger → Jeffy (task: `banking77`) → route to different teams based on the classification label
 
-**Input:** "I need to cancel my credit card"
+**Input:** "I was charged twice for my last transaction"
+
 **Output:**
 ```json
 {
-  "label": "cancel_transfer",
-  "confidence": 0.94,
-  "latency_ms": 12.3
+  "label": "transaction_charged_twice",
+  "confidence": 0.9963,
+  "margin": 0.995,
+  "out_of_scope": false
 }
 ```
+
+Use `confidence` and `margin` (the gap between the top two classes) to decide when to auto-route and when to send something for human review. Not every message scores this high: ambiguous ones land between 0.3 and 0.6, which is the signal to escalate rather than auto-route.
+
+## Example workflows
+
+Two importable workflows are in [`examples/`](examples/):
+
+| File | Needs | Works on |
+|---|---|---|
+| [`customer-support-router.json`](examples/customer-support-router.json) | this community node | self-hosted n8n |
+| [`cloud-http-router.json`](examples/cloud-http-router.json) | nothing, plain HTTP Request nodes | n8n Cloud and self-hosted |
+
+Both use a Manual Trigger with sample messages so you can run them immediately. The Cloud one implements three-tier routing: auto-route above 0.8 confidence, suggest-and-confirm between 0.5 and 0.8, manual review below, plus a separate branch for out-of-scope input.
 
 ## Available pretrained tasks
 

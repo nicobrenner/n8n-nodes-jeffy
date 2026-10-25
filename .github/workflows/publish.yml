@@ -1,0 +1,71 @@
+# Publishes this package to npm with an npm provenance attestation.
+#
+# Since 2026-05-01 n8n requires verified community nodes to be published from
+# GitHub Actions with provenance. Packages published from a local machine fail
+# `npx @n8n/scan-community-package` and cannot be verified.
+#
+# ONE-TIME SETUP, pick one:
+#
+#   A. Trusted publishing (recommended, no stored secret)
+#      npmjs.com -> package settings -> Publish access -> Trusted Publishers
+#      -> Add a publisher -> GitHub Actions:
+#        Repository owner: nicobrenner
+#        Repository name:  n8n-nodes-jeffy
+#        Workflow name:    publish.yml
+#        Environment:      (blank)
+#      Leave NPM_TOKEN unset.
+#
+#   B. Automation token (fallback)
+#      gh secret set NPM_TOKEN -R nicobrenner/n8n-nodes-jeffy
+#
+# RELEASE: bump "version" in package.json, commit, then tag and push:
+#   git tag 0.1.3 && git push origin 0.1.3
+
+name: Publish
+
+on:
+  push:
+    tags:
+      - '*.*.*'
+
+jobs:
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+
+    permissions:
+      # Required to mint the OIDC token that signs the provenance attestation.
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Verify tag matches package.json version
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          PKG="$(node -p "require('./package.json').version")"
+          if [ "$TAG" != "$PKG" ]; then
+            echo "Tag $TAG does not match package.json version $PKG" >&2
+            exit 1
+          fi
+
+      - name: Publish with provenance
+        # With NPM_TOKEN set, setup-node's registry config authenticates via
+        # NODE_AUTH_TOKEN. Without it, npm falls back to OIDC trusted publishing.
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
