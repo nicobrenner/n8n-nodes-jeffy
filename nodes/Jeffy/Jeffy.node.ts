@@ -16,6 +16,7 @@ export class Jeffy implements INodeType {
 		icon: 'file:jeffy.svg',
 		group: ['transform'],
 		version: 1,
+		usableAsTool: true,
 		subtitle: '={{$parameter["operation"]}}',
 		description: 'Classify text using Jeffy — frozen embeddings + logistic regression',
 		defaults: { name: 'Jeffy' },
@@ -64,7 +65,7 @@ export class Jeffy implements INodeType {
 
 			// --- Classify fields ---
 			{
-				displayName: 'Task',
+				displayName: 'Task Name or ID',
 				name: 'task',
 				type: 'options',
 				typeOptions: {
@@ -72,7 +73,8 @@ export class Jeffy implements INodeType {
 				},
 				required: true,
 				default: '',
-				description: 'The classification task to use',
+				description:
+					'The classification task to use. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 				displayOptions: {
 					show: { operation: ['classify', 'batchClassify'] },
 				},
@@ -132,7 +134,7 @@ export class Jeffy implements INodeType {
 				const credentials = await this.getCredentials('jeffyApi');
 				const baseUrl = (credentials.baseUrl as string).replace(/\/+$/, '');
 
-				const response = await this.helpers.httpRequest({
+				const response = await this.helpers.httpRequestWithAuthentication.call(this, 'jeffyApi', {
 					method: 'GET',
 					url: `${baseUrl}/v1/capabilities`,
 					headers: { Accept: 'application/json' },
@@ -151,12 +153,10 @@ export class Jeffy implements INodeType {
 		const operation = this.getNodeParameter('operation', 0) as string;
 		const credentials = await this.getCredentials('jeffyApi');
 		const baseUrl = (credentials.baseUrl as string).replace(/\/+$/, '');
-		const apiKey = credentials.apiKey as string;
 
+		// The Authorization header comes from the credential's authenticate(),
+		// which only sets it when an API key is actually configured.
 		const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-		if (apiKey) {
-			headers['Authorization'] = `Bearer ${apiKey}`;
-		}
 
 		const items = this.getInputData();
 		const returnData: INodeExecutionData[] = [];
@@ -172,14 +172,18 @@ export class Jeffy implements INodeType {
 					body.threshold = options.threshold;
 				}
 
-				const response = await this.helpers.httpRequest({
-					method: 'POST',
-					url: `${baseUrl}/v1/predict`,
-					body,
-					headers,
-				});
+				const response = await this.helpers.httpRequestWithAuthentication.call(
+					this,
+					'jeffyApi',
+					{
+						method: 'POST',
+						url: `${baseUrl}/v1/predict`,
+						body,
+						headers,
+					},
+				);
 
-				returnData.push({ json: response as IDataObject });
+				returnData.push({ json: response as IDataObject, pairedItem: { item: i } });
 			}
 		} else if (operation === 'batchClassify') {
 			const task = this.getNodeParameter('task', 0) as string;
@@ -192,19 +196,21 @@ export class Jeffy implements INodeType {
 				texts = textsRaw.split('\n').map((t) => t.trim()).filter(Boolean);
 			}
 
-			const response = await this.helpers.httpRequest({
+			const response = await this.helpers.httpRequestWithAuthentication.call(this, 'jeffyApi', {
 				method: 'POST',
 				url: `${baseUrl}/v1/predict/batch`,
 				body: { task, texts },
 				headers,
 			});
 
+			// One request covers every text, so all predictions trace back to the
+			// first input item.
 			const predictions = response.predictions as IDataObject[];
 			for (const prediction of predictions) {
-				returnData.push({ json: prediction });
+				returnData.push({ json: prediction, pairedItem: { item: 0 } });
 			}
 		} else if (operation === 'listCapabilities') {
-			const response = await this.helpers.httpRequest({
+			const response = await this.helpers.httpRequestWithAuthentication.call(this, 'jeffyApi', {
 				method: 'GET',
 				url: `${baseUrl}/v1/capabilities`,
 				headers,
@@ -212,16 +218,16 @@ export class Jeffy implements INodeType {
 
 			const capabilities = response.capabilities as IDataObject[];
 			for (const cap of capabilities) {
-				returnData.push({ json: cap });
+				returnData.push({ json: cap, pairedItem: { item: 0 } });
 			}
 		} else if (operation === 'healthCheck') {
-			const response = await this.helpers.httpRequest({
+			const response = await this.helpers.httpRequestWithAuthentication.call(this, 'jeffyApi', {
 				method: 'GET',
 				url: `${baseUrl}/health`,
 				headers,
 			});
 
-			returnData.push({ json: response as IDataObject });
+			returnData.push({ json: response as IDataObject, pairedItem: { item: 0 } });
 		}
 
 		return [returnData];

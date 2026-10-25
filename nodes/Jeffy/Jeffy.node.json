@@ -2,7 +2,7 @@
 	"node": "n8n-nodes-jeffy.jeffy",
 	"nodeVersion": "1.0",
 	"codexVersion": "1.0",
-	"categories": ["AI", "Miscellaneous"],
+	"categories": ["Utility", "Productivity"],
 	"resources": {
 		"primaryDocumentation": [
 			{
@@ -10,8 +10,5 @@
 			}
 		]
 	},
-	"alias": ["classify", "classification", "text", "nlp", "ml", "jeffy", "embeddings"],
-	"subcategories": {
-		"AI": ["Text Classification"]
-	}
+	"alias": ["classify", "classification", "text", "nlp", "ml", "jeffy", "embeddings"]
 }

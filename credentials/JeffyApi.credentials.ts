@@ -1,7 +1,9 @@
 import type {
-	IAuthenticateGeneric,
+	ICredentialDataDecryptedObject,
 	ICredentialTestRequest,
 	ICredentialType,
+	IHttpRequestOptions,
+	Icon,
 	INodeProperties,
 } from 'n8n-workflow';
 
@@ -9,6 +11,7 @@ export class JeffyApi implements ICredentialType {
 	name = 'jeffyApi';
 	displayName = 'Jeffy API';
 	documentationUrl = 'https://jeffyclassify.com';
+	icon: Icon = 'file:jeffy.svg';
 
 	properties: INodeProperties[] = [
 		{
@@ -30,14 +33,24 @@ export class JeffyApi implements ICredentialType {
 		},
 	];
 
-	authenticate: IAuthenticateGeneric = {
-		type: 'generic',
-		properties: {
-			headers: {
-				Authorization: '={{"Bearer " + $credentials.apiKey}}',
-			},
-		},
-	};
+	// Jeffy needs no authentication by default, so only send a bearer token when
+	// the user actually set one. A generic authenticate block would send a bare
+	// "Bearer " on every request, which some reverse proxies reject outright.
+	async authenticate(
+		credentials: ICredentialDataDecryptedObject,
+		requestOptions: IHttpRequestOptions,
+	): Promise<IHttpRequestOptions> {
+		const apiKey = (credentials.apiKey as string | undefined)?.trim();
+
+		if (apiKey) {
+			requestOptions.headers = {
+				...requestOptions.headers,
+				Authorization: `Bearer ${apiKey}`,
+			};
+		}
+
+		return requestOptions;
+	}
 
 	test: ICredentialTestRequest = {
 		request: {

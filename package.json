@@ -1,7 +1,7 @@
 {
 	"name": "n8n-nodes-jeffy",
-	"version": "0.1.3",
-	"description": "n8n community node for Jeffy — fast text classification powered by frozen embeddings + logistic regression",
+	"version": "0.1.4",
+	"description": "n8n community node for Jeffy \u2014 fast text classification powered by frozen embeddings + logistic regression",
 	"keywords": [
 		"n8n-community-node-package",
 		"jeffy",
@@ -22,7 +22,7 @@
 	},
 	"main": "dist/nodes/Jeffy/Jeffy.node.js",
 	"scripts": {
-		"build": "tsc && cp nodes/Jeffy/jeffy.svg nodes/Jeffy/Jeffy.node.json dist/nodes/Jeffy/",
+		"build": "tsc && cp nodes/Jeffy/jeffy.svg nodes/Jeffy/Jeffy.node.json dist/nodes/Jeffy/ && cp credentials/jeffy.svg dist/credentials/",
 		"dev": "tsc --watch",
 		"lint": "eslint nodes/ credentials/ --ext .ts",
 		"prepublishOnly": "npm run build"
