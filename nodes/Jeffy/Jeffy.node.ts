@@ -13,7 +13,7 @@ export class Jeffy implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Jeffy',
 		name: 'jeffy',
-		icon: 'file:jeffy.svg',
+		icon: { light: 'file:jeffy.svg', dark: 'file:jeffy.dark.svg' },
 		group: ['transform'],
 		version: 1,
 		usableAsTool: true,

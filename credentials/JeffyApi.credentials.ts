@@ -11,7 +11,7 @@ export class JeffyApi implements ICredentialType {
 	name = 'jeffyApi';
 	displayName = 'Jeffy API';
 	documentationUrl = 'https://jeffyclassify.com';
-	icon: Icon = 'file:jeffy.svg';
+	icon: Icon = { light: 'file:jeffy.svg', dark: 'file:jeffy.dark.svg' };
 
 	properties: INodeProperties[] = [
 		{

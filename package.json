@@ -1,53 +1,52 @@
 {
-	"name": "n8n-nodes-jeffy",
-	"version": "0.1.5",
-	"description": "n8n community node for Jeffy \u2014 fast text classification powered by frozen embeddings + logistic regression",
-	"keywords": [
-		"n8n-community-node-package",
-		"jeffy",
-		"text-classification",
-		"nlp",
-		"machine-learning",
-		"embeddings"
-	],
-	"license": "MIT",
-	"homepage": "https://github.com/nicobrenner/n8n-nodes-jeffy",
-	"author": {
-		"name": "Nico Brenner",
-		"email": "nbrenner@gmail.com"
-	},
-	"repository": {
-		"type": "git",
-		"url": "git+https://github.com/nicobrenner/n8n-nodes-jeffy.git"
-	},
-	"main": "dist/nodes/Jeffy/Jeffy.node.js",
-	"scripts": {
-		"build": "tsc && cp nodes/Jeffy/jeffy.svg nodes/Jeffy/Jeffy.node.json dist/nodes/Jeffy/ && cp credentials/jeffy.svg dist/credentials/",
-		"dev": "tsc --watch",
-		"lint": "eslint .",
-		"prepublishOnly": "npm run build"
-	},
-	"files": [
-		"dist"
-	],
-	"n8n": {
-		"n8nNodesApiVersion": 1,
-		"credentials": [
-			"dist/credentials/JeffyApi.credentials.js"
-		],
-		"nodes": [
-			"dist/nodes/Jeffy/Jeffy.node.js"
-		]
-	},
-	"devDependencies": {
-		"@n8n/eslint-plugin-community-nodes": "^0.37.0",
-		"@types/node": "^22.0.0",
-		"@typescript-eslint/parser": "^8.70.0",
-		"eslint": "^9.29.0",
-		"eslint-plugin-n8n-nodes-base": "^2.0.0",
-		"typescript": "~5.7.0"
-	},
-	"peerDependencies": {
-		"n8n-workflow": "*"
-	}
+  "name": "n8n-nodes-jeffy",
+  "version": "0.1.6",
+  "description": "n8n community node for Jeffy: fast text classification powered by frozen embeddings + logistic regression",
+  "keywords": [
+    "n8n-community-node-package",
+    "jeffy",
+    "text-classification",
+    "nlp",
+    "machine-learning",
+    "embeddings"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/nicobrenner/n8n-nodes-jeffy",
+  "author": {
+    "name": "Nico Brenner",
+    "email": "nbrenner@gmail.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nicobrenner/n8n-nodes-jeffy.git"
+  },
+  "main": "dist/nodes/Jeffy/Jeffy.node.js",
+  "scripts": {
+    "build": "n8n-node build && cp nodes/Jeffy/Jeffy.node.json dist/nodes/Jeffy/",
+    "dev": "n8n-node dev",
+    "lint": "n8n-node lint",
+    "lint:fix": "n8n-node lint --fix",
+    "prepublishOnly": "npm run build"
+  },
+  "files": [
+    "dist"
+  ],
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "credentials": [
+      "dist/credentials/JeffyApi.credentials.js"
+    ],
+    "nodes": [
+      "dist/nodes/Jeffy/Jeffy.node.js"
+    ],
+    "strict": true
+  },
+  "devDependencies": {
+    "@n8n/node-cli": "^0.53.4",
+    "@types/node": "^22.0.0",
+    "typescript": "~5.7.0"
+  },
+  "peerDependencies": {
+    "n8n-workflow": "*"
+  }
 }

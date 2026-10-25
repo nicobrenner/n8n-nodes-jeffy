@@ -48,11 +48,15 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
           cache: 'npm'
 
+      # --ignore-scripts because @n8n/node-cli pulls in n8n itself, whose
+      # isolated-vm dependency compiles native code. Only `n8n-node dev` needs
+      # that; lint and build do not.
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
-      # Same rule set the verification scanner applies, so a release cannot
-      # introduce a violation that would later fail n8n's review.
+      # `n8n-node lint` with the CLI's default config, which is what n8n runs
+      # during review. The node also sets n8n.strict in package.json, so the
+      # linter rejects a modified config rather than silently allowing it.
       - name: Lint
         run: npm run lint
 
